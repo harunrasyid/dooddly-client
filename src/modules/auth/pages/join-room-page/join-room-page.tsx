@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Button,
   VStack,
@@ -8,53 +7,41 @@ import {
   FormControl,
   FormLabel,
 } from "@chakra-ui/react";
+import { useCreate, useJoin } from "./hooks";
 import { styles } from "./join-room-page.style.ts";
 
 export const JoinRoomPage = () => {
-  const [createRoomData, setCreateRoomData] = useState({
-    name: "",
-    roomCode: "",
-  });
-  const [joinRoomData, setJoinRoomData] = useState({ name: "", roomCode: "" });
+  // Handle create room form
+  const createForm = useCreate();
 
-  const handleCreateRoom = () => {
-    console.log("Creating room with: ", createRoomData);
-  };
-
-  const handleJoinRoom = () => {
-    console.log("Joining room with: ", joinRoomData);
-  };
+  // Handle join room form
+  const joinForm = useJoin();
 
   return (
     <VStack sx={styles.container}>
       <HStack sx={styles.wrapper}>
-        {/* Create Room Column */}
+        {/* Create Room */}
         <VStack sx={styles.box}>
           <Heading size="lg">Create Room</Heading>
           <FormControl>
             <FormLabel>Name</FormLabel>
             <Input
               placeholder="Enter your name"
-              value={createRoomData.name}
-              onChange={(e) =>
-                setCreateRoomData({ ...createRoomData, name: e.target.value })
-              }
+              {...createForm.register("name")}
             />
           </FormControl>
           <FormControl>
             <FormLabel>Room Code</FormLabel>
             <Input
               placeholder="Enter room code"
-              value={createRoomData.roomCode}
-              onChange={(e) =>
-                setCreateRoomData({
-                  ...createRoomData,
-                  roomCode: e.target.value,
-                })
-              }
+              {...createForm.register("roomCode")}
             />
           </FormControl>
-          <Button colorScheme="blue" width="full" onClick={handleCreateRoom}>
+          <Button
+            colorScheme="blue"
+            width="full"
+            onClick={createForm.handleSubmit(createForm.onSubmit)}
+          >
             Create Room
           </Button>
         </VStack>
@@ -66,23 +53,21 @@ export const JoinRoomPage = () => {
             <FormLabel>Name</FormLabel>
             <Input
               placeholder="Enter your name"
-              value={joinRoomData.name}
-              onChange={(e) =>
-                setJoinRoomData({ ...joinRoomData, name: e.target.value })
-              }
+              {...joinForm.register("name")}
             />
           </FormControl>
           <FormControl>
             <FormLabel>Room Code</FormLabel>
             <Input
               placeholder="Enter room code"
-              value={joinRoomData.roomCode}
-              onChange={(e) =>
-                setJoinRoomData({ ...joinRoomData, roomCode: e.target.value })
-              }
+              {...joinForm.register("roomCode")}
             />
           </FormControl>
-          <Button colorScheme="green" width="full" onClick={handleJoinRoom}>
+          <Button
+            colorScheme="green"
+            width="full"
+            onClick={joinForm.handleSubmit(joinForm.onSubmit)}
+          >
             Join Room
           </Button>
         </VStack>
