@@ -1,12 +1,8 @@
 import "./App.css";
-import { Text, VStack } from "@chakra-ui/react";
+import { JoinRoomPage } from "@/modules";
 
 const App = () => {
-  return (
-    <VStack>
-      <Text>Hello World!</Text>
-    </VStack>
-  );
+  return <JoinRoomPage />;
 };
 
 export default App;
