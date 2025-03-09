@@ -15,5 +15,10 @@ export function useToolbar() {
     setColor(newColor);
   };
 
-  return { tools, onChangeTools, color, onChangeColor };
+  return {
+    tools,
+    onChangeTools,
+    color,
+    onChangeColor,
+  };
 }
