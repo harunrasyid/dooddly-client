@@ -8,6 +8,11 @@ export const Toolbar = ({
   onChangeTools,
   color,
   onChangeColor,
+  onClearCanvas,
+  onUndo,
+  disableUndo,
+  onRedo,
+  disableRedo,
 }: IToolbarProps) => {
   return (
     <HStack sx={styles.toolbarContainer}>
@@ -35,14 +40,20 @@ export const Toolbar = ({
 
         {/* Undo & Redo */}
         <HStack>
-          <Button colorScheme={"blue"}>Undo</Button>
-          <Button>Redo</Button>
+          <Button colorScheme={"blue"} disabled={disableUndo} onClick={onUndo}>
+            Undo
+          </Button>
+          <Button disabled={disableRedo} onClick={onRedo}>
+            Redo
+          </Button>
         </HStack>
       </HStack>
 
       {/* Reset Button */}
       <HStack sx={styles.toolbarRight}>
-        <Button colorScheme={"red"}>Clear Canvas</Button>
+        <Button onClick={onClearCanvas} colorScheme={"red"}>
+          Clear Canvas
+        </Button>
       </HStack>
     </HStack>
   );
