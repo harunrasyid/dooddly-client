@@ -1,151 +1,128 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  useCallback,
-} from "react";
-import rough from "roughjs";
-import { IWhiteboardElement } from "../types";
+import React, { useEffect, useRef, useState } from "react";
+import { useSocket } from "@/socket";
+import { IDrawData } from "../types";
 
-export function useWhiteboard(color: string) {
+export function useWhiteboard(color: string, room: string) {
+  const socket = useSocket();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const contextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
-  const [elements, setElements] = useState<IWhiteboardElement[]>([]);
-  const [history, setHistory] = useState<IWhiteboardElement[]>([]);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [history, setHistory] = useState<IDrawData[][]>([]);
+  const [redoStack, setRedoStack] = useState<IDrawData[][]>([]);
 
-  const onMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      const { offsetX, offsetY } = e.nativeEvent;
-
-      setElements((prevElements) => [
-        ...prevElements,
-        {
-          type: "pencil",
-          offsetX,
-          offsetY,
-          path: [[offsetX, offsetY]],
-          stroke: color,
-        },
-      ]);
-      setIsDrawing(true);
-    },
-    [color],
-  );
-
-  const onMouseMove = useCallback(
-    (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-      if (!isDrawing || elements.length === 0) return;
-
-      const { offsetX, offsetY } = e.nativeEvent;
-      setElements((prevElements) => {
-        const newElements = [...prevElements];
-        newElements[newElements.length - 1] = {
-          ...newElements[newElements.length - 1],
-          path: [
-            ...newElements[newElements.length - 1].path,
-            [offsetX, offsetY],
-          ],
-        };
-        return newElements;
-      });
-    },
-    [isDrawing, elements],
-  );
-
-  const onMouseUp = useCallback(() => {
-    setIsDrawing(false);
-  }, []);
-
-  const onClearCanvas = useCallback(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.fillStyle = "white";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    setElements([]);
-    setHistory([]);
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
   }, []);
 
-  const onUndo = useCallback(() => {
-    if (elements.length === 0) return;
+  useEffect(() => {
+    if (!socket) return;
 
-    setHistory((prevHistory) => [
-      ...prevHistory,
-      elements[elements.length - 1],
-    ]);
-    setElements((prevElements) => prevElements.slice(0, -1));
-  }, [elements]);
+    socket.emit("joinRoom", room);
 
-  const onRedo = useCallback(() => {
+    socket.on("draw", (drawData: IDrawData) => drawOnCanvas(drawData));
+    socket.on("loadHistory", (historyData: IDrawData[][]) => {
+      setHistory(historyData);
+      redrawCanvas(historyData);
+    });
+
+    return () => {
+      socket.off("draw");
+      socket.off("loadHistory");
+    };
+  }, [socket, room]);
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+
+    setIsDrawing(true);
+    lastPosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const stopDrawing = () => {
+    if (isDrawing) {
+      setIsDrawing(false);
+      setRedoStack([]); // Clear redo stack on new draw
+    }
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !lastPosRef.current) return;
+    const rect = canvas.getBoundingClientRect();
+
+    const drawData: IDrawData = {
+      prevX: lastPosRef.current.x,
+      prevY: lastPosRef.current.y,
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+      color,
+    };
+
+    setHistory((prev) => [...prev, [drawData]]);
+    drawOnCanvas(drawData);
+    socket.emit("draw", { room, drawData });
+
+    lastPosRef.current = { x: drawData.x, y: drawData.y };
+  };
+
+  const drawOnCanvas = (drawData: IDrawData) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.strokeStyle = drawData.color;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(drawData.prevX, drawData.prevY);
+    ctx.lineTo(drawData.x, drawData.y);
+    ctx.stroke();
+  };
+
+  const undo = () => {
     if (history.length === 0) return;
+    const lastDraw = history.pop();
+    setRedoStack((prev) => [...prev, lastDraw!]);
+    setHistory([...history]);
+    redrawCanvas(history);
+    socket.emit("undo", room);
+  };
 
-    setElements((prevElements) => [
-      ...prevElements,
-      history[history.length - 1],
-    ]);
-    setHistory((prevHistory) => prevHistory.slice(0, -1));
-  }, [history]);
+  const redo = () => {
+    if (redoStack.length === 0) return;
+    const lastRedo = redoStack.pop();
+    setHistory((prev) => [...prev, lastRedo!]);
+    drawOnCanvas(lastRedo![0]);
+    socket.emit("redo", room);
+  };
 
-  useEffect(() => {
+  const redrawCanvas = (drawHistory: IDrawData[][]) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    canvas.width = window.innerWidth * 2;
-    canvas.height = window.innerHeight * 2;
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
-
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.scale(2, 2);
-      ctx.lineCap = "round";
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 5;
-      contextRef.current = ctx;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (contextRef.current) {
-      contextRef.current.strokeStyle = color;
-    }
-  }, [color]);
-
-  useLayoutEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const roughCanvas = rough.canvas(canvas);
-
-    elements.forEach((element) => {
-      roughCanvas.linearPath(element.path, {
-        stroke: element.stroke,
-        roughness: 0,
-        strokeWidth: 5,
-      });
-    });
-  }, [elements]);
+    drawHistory.forEach((stroke) => stroke.forEach(drawOnCanvas));
+  };
 
   return {
-    onMouseDown,
-    onMouseMove,
-    onMouseUp,
+    startDrawing,
+    stopDrawing,
     canvasRef,
-    onClearCanvas,
-    onUndo,
-    disableUndo: elements.length === 0,
-    onRedo,
-    disableRedo: history.length === 0,
+    draw,
+    onUndo: undo,
+    onRedo: redo,
+    disableUndo: history.length === 0,
+    disableRedo: redoStack.length === 0,
   };
 }

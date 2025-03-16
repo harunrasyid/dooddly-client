@@ -4,19 +4,19 @@ import { IWhiteboardProps } from "./whiteboard.props.ts";
 
 export const Whiteboard = ({
   canvasRef,
-  onMouseDown,
-  onMouseMove,
-  onMouseUp,
+  startDrawing,
+  stopDrawing,
+  draw,
 }: IWhiteboardProps) => {
   return (
-    <VStack
-      as={"div"}
-      onMouseDown={onMouseDown}
-      onMouseUp={onMouseUp}
-      onMouseMove={onMouseMove}
-      sx={styles.canvas}
-    >
-      <canvas ref={canvasRef} />
+    <VStack sx={styles.canvas}>
+      <canvas
+        ref={canvasRef}
+        onMouseDown={startDrawing}
+        onMouseUp={stopDrawing}
+        onMouseMove={draw}
+        style={{ cursor: "crosshair" }}
+      />
     </VStack>
   );
 };

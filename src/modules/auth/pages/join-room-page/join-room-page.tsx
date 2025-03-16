@@ -6,13 +6,16 @@ import {
   Heading,
   FormControl,
   FormLabel,
+  useClipboard,
 } from "@chakra-ui/react";
 import { useCreate, useJoin } from "./hooks";
 import { styles } from "./join-room-page.style.ts";
+import { generateUUID } from "@/utils";
 
 export const JoinRoomPage = () => {
   // Handle create room form
   const createForm = useCreate();
+  const { hasCopied, onCopy } = useClipboard(createForm.watch("roomCode"));
 
   // Handle join room form
   const joinForm = useJoin();
@@ -32,10 +35,23 @@ export const JoinRoomPage = () => {
           </FormControl>
           <FormControl>
             <FormLabel>Room Code</FormLabel>
-            <Input
-              placeholder="Enter room code"
-              {...createForm.register("roomCode")}
-            />
+            <HStack>
+              <Input
+                placeholder="Enter room code"
+                {...createForm.register("roomCode")}
+                disabled
+              />
+              <Button
+                onClick={() => createForm.setValue("roomCode", generateUUID())}
+                size={"xs"}
+                colorScheme="red"
+              >
+                Generate
+              </Button>
+              <Button onClick={onCopy} size={"xs"} colorScheme="blue">
+                {hasCopied ? "Copied!" : "Copy"}
+              </Button>
+            </HStack>
           </FormControl>
           <Button
             colorScheme="blue"
