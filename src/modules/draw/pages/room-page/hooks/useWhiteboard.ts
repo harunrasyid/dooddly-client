@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useSocket } from "@/socket";
-import { IDrawData } from "../types";
+import { IDrawData, ILoadResponse } from "../types";
 
 export function useWhiteboard(color: string, room: string) {
   const socket = useSocket();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
+  const currentStrokeRef = useRef<IDrawData[]>([]); // Store the current stroke
 
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
   const [history, setHistory] = useState<IDrawData[][]>([]);
@@ -22,12 +23,17 @@ export function useWhiteboard(color: string, room: string) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.emit("joinRoom", room);
+    socket.emit("loadHistory", room);
 
-    socket.on("draw", (drawData: IDrawData) => drawOnCanvas(drawData));
-    socket.on("loadHistory", (historyData: IDrawData[][]) => {
-      setHistory(historyData);
-      redrawCanvas(historyData);
+    socket.on("draw", (drawData: IDrawData[]) => {
+      setHistory((prev) => [...prev, drawData]); // Save full stroke
+      drawData.forEach((dat) => drawOnCanvas(dat));
+    });
+
+    socket.on("loadHistory", (response: ILoadResponse) => {
+      setHistory(response.history);
+      setRedoStack(response.redoStack);
+      redrawCanvas(response.history);
     });
 
     return () => {
@@ -43,13 +49,18 @@ export function useWhiteboard(color: string, room: string) {
 
     setIsDrawing(true);
     lastPosRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    currentStrokeRef.current = []; // Reset current stroke
   };
 
   const stopDrawing = () => {
-    if (isDrawing) {
-      setIsDrawing(false);
-      setRedoStack([]); // Clear redo stack on new draw
+    if (!isDrawing) return;
+
+    setIsDrawing(false);
+    if (currentStrokeRef.current.length > 0) {
+      setHistory((prev) => [...prev, currentStrokeRef.current]); // Save full stroke
+      socket.emit("draw", { room, drawData: currentStrokeRef.current });
     }
+    setRedoStack([]); // Clear redo stack
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -66,9 +77,8 @@ export function useWhiteboard(color: string, room: string) {
       color,
     };
 
-    setHistory((prev) => [...prev, [drawData]]);
+    currentStrokeRef.current.push(drawData); // Add to current stroke
     drawOnCanvas(drawData);
-    socket.emit("draw", { room, drawData });
 
     lastPosRef.current = { x: drawData.x, y: drawData.y };
   };
@@ -90,8 +100,8 @@ export function useWhiteboard(color: string, room: string) {
 
   const undo = () => {
     if (history.length === 0) return;
-    const lastDraw = history.pop();
-    setRedoStack((prev) => [...prev, lastDraw!]);
+    const lastStroke = history.pop();
+    setRedoStack((prev) => [...prev, lastStroke!]);
     setHistory([...history]);
     redrawCanvas(history);
     socket.emit("undo", room);
@@ -101,8 +111,12 @@ export function useWhiteboard(color: string, room: string) {
     if (redoStack.length === 0) return;
     const lastRedo = redoStack.pop();
     setHistory((prev) => [...prev, lastRedo!]);
-    drawOnCanvas(lastRedo![0]);
+    redrawCanvas(history.concat([lastRedo!]));
     socket.emit("redo", room);
+  };
+
+  const clearCanvas = () => {
+    socket.emit("clear", room);
   };
 
   const redrawCanvas = (drawHistory: IDrawData[][]) => {
@@ -112,7 +126,9 @@ export function useWhiteboard(color: string, room: string) {
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    drawHistory.forEach((stroke) => stroke.forEach(drawOnCanvas));
+    drawHistory.forEach((stroke) => {
+      if (stroke.length > 0) stroke.forEach(drawOnCanvas);
+    });
   };
 
   return {
@@ -122,6 +138,7 @@ export function useWhiteboard(color: string, room: string) {
     draw,
     onUndo: undo,
     onRedo: redo,
+    onClearCanvas: clearCanvas,
     disableUndo: history.length === 0,
     disableRedo: redoStack.length === 0,
   };

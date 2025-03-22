@@ -32,7 +32,7 @@ export function useCreate() {
   });
 
   const onSubmit = async (data: ICreateRoomForm) => {
-    socket.emit("userJoinRoom", data, {
+    socket.emit("userCreateRoom", data, {
       ...data,
       userId: generateUUID(),
       host: true,

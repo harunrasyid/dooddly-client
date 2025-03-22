@@ -24,8 +24,6 @@ export const Toolbar = ({
           onChange={(e) => onChangeTools?.(e.target.value as EToolOptions)}
         >
           <option value={EToolOptions.Pencil}>Pencil</option>
-          <option value={EToolOptions.Line}>Line</option>
-          <option value={EToolOptions.Rectangle}>Rectangle</option>
         </Select>
 
         {/* Select Color */}
