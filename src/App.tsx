@@ -1,11 +1,14 @@
+import { Routes, Route } from "react-router";
+import { JoinRoomPage, RoomPage } from "@/modules";
 import "./App.css";
-import { Text, VStack } from "@chakra-ui/react";
 
 const App = () => {
   return (
-    <VStack>
-      <Text>Hello World!</Text>
-    </VStack>
+    <Routes>
+      {/* TODO: add auth */}
+      <Route path="/" element={<JoinRoomPage />} />
+      <Route path="/:roomId" element={<RoomPage />} />
+    </Routes>
   );
 };
 
